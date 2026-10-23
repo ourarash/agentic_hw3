@@ -1,0 +1,4 @@
+# Retrieval, chunking, and checks use only the Python standard library.
+openai==2.24.0
+pydantic==2.13.5
+pytest==9.1.1
