@@ -7,8 +7,8 @@ import asyncio
 import json
 import os
 
-from answer_model import generate_answer_with_openai, scripted_answer_generator
-from la_notes import DOCUMENTS, TRIP_QUESTION, keyword_search
+from support.answer_model import generate_answer_with_openai, scripted_answer_generator
+from support.la_notes import DOCUMENTS, TRIP_QUESTION, keyword_search
 from rag_pipeline import (
     answer_question,
     evaluate_retrieval,

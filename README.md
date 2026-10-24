@@ -25,7 +25,7 @@ The collection also contains an altered snapshot with the wrong closing time
 and a forum post that tries to redirect the model. Your code has to handle
 both.
 
-The embeddings come from a small, hand-written function in `la_notes.py`, so
+The embeddings come from a small, hand-written function in `support/`, so
 retrieval runs offline with no model download. A real embedding model would
 learn its coordinates; the arithmetic you write is the same.
 
@@ -41,21 +41,23 @@ pip install -r requirements.txt
 pytest -q
 ```
 
-The initial test failures are expected. Each failure points to unfinished
-work. The `test_00` tests cover supplied code and pass from the start.
+The initial test failures are expected. Each failure names the TODO it
+checks. The tests in `support/` cover supplied code and pass from the start.
 
-## Your work
+## Start here
 
-Edit only these files:
+You do not need to read the whole folder before you start.
 
-| File | Work |
+| File | What to do |
 |---|---|
-| `rag_pipeline.py` | TODO 1–6: chunks, vector search, hybrid merge, model input, citation checks, and recall@k |
-| `ANSWERS.md` | Four short explanations |
+| `rag_pipeline.py` | **Edit.** TODO 1–6. Each TODO shows its input, expected output, and the helper to call. |
+| `ANSWERS.md` | **Edit.** Four short explanations. |
+| `run_demo.py` | **Run.** Prints retrieval results, a recall@k table, and the verifier's reports. |
+| `test_hw3.py` | **Run** with `pytest -q`. You do not need to read it. |
+| `support/` | **Ignore.** Documents, keyword search, the toy embedding, and the model call. |
 
-Read `la_notes.py` (documents, keyword search, toy embedding, evaluation
-questions) and `answer_model.py` (the model call and fixed responses) first.
-Do not edit them.
+Work through the TODOs in order. Run `pytest -q` after each one; the next
+group of tests should pass.
 
 ### Part 1: Prepare and retrieve
 

@@ -1,8 +1,8 @@
 """Fixed documents, search helpers, and evaluation questions for HW 3.
 
-Read this file before editing ``rag_pipeline.py``. It contains the shared
-course data, so your work can focus on chunking, retrieval, the model input,
-and citation checks.
+You do not need to read this file. Each TODO in ``rag_pipeline.py`` names the
+helper it uses and shows the data it receives. Open this file only if you are
+curious about the documents or the toy embedding.
 
 The passages adapt the Session 07 LA visitor notes, saved 21 October 2026.
 Snapshot A is an invented conflict test, and the forum post is invented. The

@@ -1,7 +1,9 @@
 """HW 3: answer an LA visit question from retrieved, cited evidence.
 
-Read ``la_notes.py`` and ``answer_model.py`` before editing this file. The
-supplied ``answer_question`` function at the bottom connects your TODOs:
+This is the only code file you edit. Each TODO below shows its input, the
+expected output, and the supplied helper to call, so you do not need to open
+``support/``. The supplied ``answer_question`` function at the bottom connects
+your TODOs:
 
     prepare chunks -> hybrid search -> model input -> model -> verify
 
@@ -15,7 +17,7 @@ import json
 from collections.abc import Callable
 from typing import TypedDict
 
-from la_notes import (
+from support.la_notes import (
     DOCUMENTS,
     EVAL_QUESTIONS,
     Chunk,
@@ -24,7 +26,7 @@ from la_notes import (
     keyword_search,
     vector_norm,
 )
-from answer_model import AnswerGenerator, GroundedAnswer
+from support.answer_model import AnswerGenerator, GroundedAnswer
 
 
 class ClaimCheck(TypedDict):
@@ -46,36 +48,48 @@ Search = Callable[[str, list[Chunk], int], list[str]]
 
 # TODO 1: Prepare the chunk collection.
 #
-# Return one ``Chunk`` for each ``## `` section of every document whose
-# ``status`` is ``"verified"``. Skip the altered snapshot entirely so its
-# 8 p.m. closing time can never reach the model.
+# Input: a list of documents shaped like this (``body`` is Markdown):
 #
-# A heading line looks like ``## C2: Griffith Observatory paid parking``.
-# Use the text before the colon as ``chunk_id`` and the text after it as
-# ``section``. Copy ``document``, ``snapshot``, and ``source`` from the
-# document.
+#   {"document": "LA Visitor Notes", "snapshot": "B", "status": "verified",
+#    "source": "Griffith Observatory, ...",
+#    "body": "## C1: Griffith Observatory Saturday building hours\n"
+#            "Saturday building hours: 10 a.m. to 10 p.m.\n"
+#            "\n"
+#            "## C2: Griffith Observatory paid parking\n"
+#            "Paid parking is available in the Observatory lot and along West\n"
+#            "Observatory Road. ...\n"}
 #
-# Build ``text`` as the section title, a newline, and the section's non-empty
-# body lines stripped and joined with single spaces. For example:
+# Output: one ``Chunk`` dict per ``## `` section, in order, for documents whose
+# ``status`` is ``"verified"``. Skip the ``"altered"`` snapshot entirely so its
+# wrong 8 p.m. closing time never reaches the model. For the C1 section above:
 #
-#   "Griffith Observatory Saturday building hours\n"
-#   "Saturday building hours: 10 a.m. to 10 p.m."
+#   {"chunk_id": "C1",                       # text before the colon
+#    "section": "Griffith Observatory Saturday building hours",  # after it
+#    "document": "LA Visitor Notes", "snapshot": "B", "source": "...",
+#    "text": "Griffith Observatory Saturday building hours\n"
+#            "Saturday building hours: 10 a.m. to 10 p.m."}
 #
-# The body alone never says "Griffith Observatory". Keeping the heading lets
-# a retrieved chunk be understood without the rest of the document.
+# ``text`` is the section title, a newline, then the section's non-empty lines
+# stripped and joined with single spaces. The body alone never says "Griffith
+# Observatory", so keeping the heading lets a chunk stand on its own.
 def prepare_chunks(documents: list[SourceDocument]) -> list[Chunk]:
     raise NotImplementedError("TODO 1: follow the instructions above")
 
 
 # TODO 2: Rank chunks by cosine similarity.
 #
-# ``cosine_similarity`` returns (a · b) / (‖a‖ × ‖b‖). Use the supplied
-# ``vector_norm``. Return 0.0 when either vector has length zero.
+# ``cosine_similarity(a, b)`` returns (a · b) / (‖a‖ × ‖b‖), or 0.0 when either
+# vector has length zero. ``vector_norm(v)`` is supplied.
 #
-# ``vector_search`` embeds the query and every chunk's ``text`` with the
-# supplied ``embed`` function. Return the IDs of the top ``k`` chunks, highest
-# score first. Break ties by collection order, and leave out chunks whose
-# score is 0.0. This matches the supplied ``keyword_search``.
+#   cosine_similarity([1, 0], [0.8, 0.6])  ->  0.8
+#   cosine_similarity([3, 4], [6, 8])      ->  1.0
+#
+# ``vector_search(query, chunks, k)`` turns text into a vector with the
+# supplied ``embed(text) -> list[float]``. Embed the query and each chunk's
+# ``"text"``, score every chunk, and return the ``chunk_id`` values of the top
+# ``k``: highest score first, ties in collection order, zero scores left out.
+#
+#   vector_search("Where can I leave my car?", chunks, 2)  ->  ["C7", "C2"]
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     raise NotImplementedError("TODO 2: follow the instructions above")
 
@@ -87,9 +101,12 @@ def vector_search(query: str, chunks: list[Chunk], k: int) -> list[str]:
 # TODO 3: Combine keyword and vector candidates.
 #
 # Return the keyword IDs followed by the vector IDs, keeping only the first
-# occurrence of each ID. Session 07's example: keyword [C1, C3] and vector
-# [C2, C1] give [C1, C3, C2]. The order records where each candidate first
-# appeared. It is not a shared relevance score.
+# occurrence of each ID.
+#
+#   hybrid_merge(["C1", "C3"], ["C2", "C1"])  ->  ["C1", "C3", "C2"]
+#
+# The order records where each candidate first appeared. It is not a shared
+# relevance score.
 def hybrid_merge(keyword_ids: list[str], vector_ids: list[str]) -> list[str]:
     raise NotImplementedError("TODO 3: follow the instructions above")
 
@@ -105,15 +122,18 @@ def hybrid_search(query: str, chunks: list[Chunk], k: int) -> list[str]:
 
 # TODO 4: Build the model input.
 #
-# Return a JSON string (use ``json.dumps(..., indent=2)``) with two keys:
+# ``cards`` is a list of chunks from TODO 1. Return
+# ``json.dumps(payload, indent=2)`` where ``payload`` is:
 #
-#   "question":       the visitor's question
-#   "evidence_cards": one object per card, in the given order, with the keys
-#                     chunk_id, document, section, snapshot, source, and text
+#   {"question": question,
+#    "evidence_cards": [
+#        {"chunk_id": ..., "document": ..., "section": ...,
+#         "snapshot": ..., "source": ..., "text": ...},   # one per card,
+#        ...                                               # in given order
+#    ]}
 #
-# The cards carry the original chunk text, not a summary. Retrieved text goes
-# only inside "evidence_cards". It never joins the model instructions, which
-# live in ``answer_model.MODEL_INSTRUCTIONS``.
+# Keep the original chunk text, not a summary. Retrieved text goes only inside
+# "evidence_cards"; the model instructions are supplied separately.
 def build_model_input(question: str, cards: list[Chunk]) -> str:
     raise NotImplementedError("TODO 4: follow the instructions above")
 
@@ -126,19 +146,26 @@ def normalize(text: str) -> str:
 
 # TODO 5: Check every claim against the cards that reached the model.
 #
-# A citation is *useful* when the claim's normalized quote is non-empty, the
-# citation names one of ``cards``, and that card's normalized text contains
-# the quote. Compare with the supplied ``normalize`` on both sides. Every
-# other citation is *unused*, including IDs that were never retrieved. A claim
-# is *supported* when its quote is not blank and at least one citation is
-# useful.
+# ``answer`` comes from the model and looks like this:
 #
-#   citation_recall    = supported claims / all claims
-#   citation_precision = useful citations / all citations
+#   {"claims": [{"text": "Pay stations take credit cards only.",
+#                "citations": ["C2"],
+#                "quote": "Pay stations take credit cards only."}, ...],
+#    "missing_info": [...]}
 #
-# Use 0.0 for either rate when its denominator is zero. Accept the answer only
-# when it has at least one claim and every claim is supported. Unused
-# citations lower precision but do not block acceptance.
+# A citation is *useful* when the claim's quote is not blank, the citation
+# names one of ``cards``, and that card's text contains the quote. Compare
+# ``normalize(quote) in normalize(card["text"])`` (``normalize`` is just
+# above). Every other citation is *unused*. A claim is *supported* when it has
+# at least one useful citation.
+#
+# Return:
+#
+#   {"accepted": True only if there is at least one claim and all are supported,
+#    "claims": [{"text": ..., "supported": ...,
+#                "useful_citations": [...], "unused_citations": [...]}, ...],
+#    "citation_recall": supported claims / all claims,         # 0.0 if none
+#    "citation_precision": useful citations / all citations}   # 0.0 if none
 #
 # Slide 48's draft has 4 claims and 5 citations: recall 3/4, precision 3/5.
 def verify_answer(answer: GroundedAnswer, cards: list[Chunk]) -> CitationReport:
@@ -147,15 +174,20 @@ def verify_answer(answer: GroundedAnswer, cards: list[Chunk]) -> CitationReport:
 
 # TODO 6: Measure retrieval with recall@k.
 #
-# ``recall_at_k`` returns the fraction of ``required_ids`` that appear in the
-# first ``k`` entries of ``ranked_ids``. Session 07's example: ranking
-# [C1, C3, C2] with required {C1, C2} gives 0.5 at k=2 and 1.0 at k=3.
+# ``recall_at_k(ranked_ids, required_ids, k)`` returns the fraction of
+# ``required_ids`` found in the first ``k`` entries of ``ranked_ids``.
 #
-# ``evaluate_retrieval`` runs ``search(question, chunks, k)`` for every entry
-# in ``EVAL_QUESTIONS`` and returns the mean recall@k. Score the full list
-# that ``search`` returns (passing ``len(ranked)`` as the cutoff to
-# ``recall_at_k``), so hybrid search is credited for every candidate it passes
-# on.
+#   recall_at_k(["C1", "C3", "C2"], ["C1", "C2"], 2)  ->  0.5
+#   recall_at_k(["C1", "C3", "C2"], ["C1", "C2"], 3)  ->  1.0
+#
+# ``evaluate_retrieval(search, chunks, k)`` loops over the supplied
+# ``EVAL_QUESTIONS``, a list like:
+#
+#   [{"question": "Where can I leave my car?", "required_ids": ["C2"]}, ...]
+#
+# For each one, call ``ranked = search(question, chunks, k)`` and score it with
+# ``recall_at_k(ranked, required_ids, len(ranked))`` so hybrid search gets
+# credit for every candidate it returns. Return the mean score.
 def recall_at_k(ranked_ids: list[str], required_ids: list[str], k: int) -> float:
     raise NotImplementedError("TODO 6: follow the instructions above")
 
